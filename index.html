@@ -79,7 +79,7 @@
                         id="new-task-title"
                         name="title"
                         type="text"
-                        maxlength="255"
+                        maxlength="256"
                         placeholder="Например, подготовить план на неделю"
                         autocomplete="off"
                         required
@@ -90,7 +90,7 @@
                         id="new-task-description"
                         name="description"
                         rows="3"
-                        maxlength="1000"
+                        maxlength="512"
                         placeholder="Описание задачи — необязательно"
                     ></textarea>
                 </div>
@@ -142,11 +142,11 @@
                 <input id="registration-email" name="email" type="email" maxlength="255" autocomplete="email" required>
 
                 <label for="registration-password">Пароль</label>
-                <input id="registration-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
-                <span class="field-hint">Минимум 6 символов</span>
+                <input id="registration-password" name="password" type="password" minlength="8" maxlength="64" autocomplete="new-password" required>
+                <span class="field-hint">Минимум 8 символов</span>
 
                 <label for="registration-password-repeat">Повторите пароль</label>
-                <input id="registration-password-repeat" name="passwordRepeat" type="password" minlength="6" autocomplete="new-password" required>
+                <input id="registration-password-repeat" name="passwordRepeat" type="password" minlength="8" maxlength="64" autocomplete="new-password" required>
 
                 <p class="form-message form-message-error is-hidden" data-form-error role="alert"></p>
                 <button class="button button-primary button-full" type="submit" data-pending-label="Создаём аккаунт…">
@@ -186,10 +186,10 @@
 
             <form id="edit-task-form" class="stacked-form">
                 <label for="edit-task-title">Название</label>
-                <input id="edit-task-title" name="title" type="text" maxlength="255" required>
+                <input id="edit-task-title" name="title" type="text" maxlength="256" required>
 
                 <label for="edit-task-description">Описание</label>
-                <textarea id="edit-task-description" name="description" rows="6" maxlength="1000" placeholder="Добавьте детали задачи"></textarea>
+                <textarea id="edit-task-description" name="description" rows="6" maxlength="512" placeholder="Добавьте детали задачи"></textarea>
 
                 <label class="checkbox-field" for="edit-task-completed">
                     <input id="edit-task-completed" name="completed" type="checkbox">

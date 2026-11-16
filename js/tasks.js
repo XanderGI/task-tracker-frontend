@@ -28,6 +28,19 @@ let allowModalClose = false;
 let isDeleting = false;
 let stateVersion = 0;
 
+function fromApi(task) {
+    return {
+        ...task,
+        description: task.text ?? "",
+        completed: Boolean(task.isFinished),
+    };
+}
+
+function toApiBody({ title, description }) {
+    return { title, text: description ?? "" };
+}
+
+
 function getTask(taskId) {
     return tasks.find((task) => task.id === Number(taskId));
 }
@@ -69,17 +82,41 @@ function hasDirtyText() {
 function queuePatch(taskId, changes) {
     const requestVersion = stateVersion;
     const operation = saveQueue.then(async () => {
-        const { data } = await apiRequest(`/tasks/${taskId}`, {
-            method: "PATCH",
-            body: changes,
-            auth: true,
-        });
-
-        if (requestVersion === stateVersion) {
-            replaceTask(data);
+        const current = tasks.find((task) => String(task.id) === String(taskId));
+        if (!current) {
+            throw new ApiError("Задача не найдена.", { status: 404 });
         }
 
-        return data;
+        let data = null;
+
+        if (changes.title !== undefined || changes.description !== undefined) {
+            ({ data } = await apiRequest(`/tasks/${taskId}`, {
+                method: "PUT",
+                body: toApiBody({
+                    title: changes.title ?? current.title,
+                    description: changes.description ?? current.description,
+                }),
+                auth: true,
+            }));
+        }
+
+        if (changes.completed !== undefined) {
+            ({ data } = await apiRequest(`/tasks/${taskId}/status`, {
+                method: "PATCH",
+                body: { done: Boolean(changes.completed) },
+                auth: true,
+            }));
+        }
+
+        if (data === null) {
+            return current;
+        }
+
+        const task = fromApi(data);
+        if (requestVersion === stateVersion) {
+            replaceTask(task);
+        }
+        return task;
     });
 
     saveQueue = operation.catch(() => undefined);
@@ -107,7 +144,7 @@ export async function loadTasks() {
     try {
         const { data } = await apiRequest("/tasks", { auth: true });
         if (requestVersion === stateVersion) {
-            tasks = Array.isArray(data) ? data : [];
+            tasks = Array.isArray(data) ? data.map(fromApi) : [];
             renderTasks(tasks, openTask);
         }
     } catch (error) {
@@ -140,12 +177,12 @@ async function createTask(event) {
     try {
         const { data } = await apiRequest("/tasks", {
             method: "POST",
-            body: { title, description },
+            body: toApiBody({ title, description }),
             auth: true,
         });
 
         if (requestVersion === stateVersion) {
-            tasks = [data, ...tasks];
+            tasks = [fromApi(data), ...tasks];
             renderTasks(tasks, openTask);
             form.reset();
         }
