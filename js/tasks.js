@@ -27,6 +27,7 @@ let lastSavedText = null;
 let allowModalClose = false;
 let isDeleting = false;
 let stateVersion = 0;
+const pendingStatuses = new Set();
 
 function fromApi(task) {
     return {
@@ -45,14 +46,18 @@ function getTask(taskId) {
     return tasks.find((task) => task.id === Number(taskId));
 }
 
+function renderTaskList() {
+    renderTasks(tasks, openTask, toggleListStatus, pendingStatuses);
+}
+
 function replaceTask(updatedTask) {
     tasks = tasks.map((task) => task.id === updatedTask.id ? updatedTask : task);
-    renderTasks(tasks, openTask);
+    renderTaskList();
 }
 
 function removeTask(taskId) {
     tasks = tasks.filter((task) => task.id !== taskId);
-    renderTasks(tasks, openTask);
+    renderTaskList();
 }
 
 function getTextFields() {
@@ -82,7 +87,11 @@ function hasDirtyText() {
 function queuePatch(taskId, changes) {
     const requestVersion = stateVersion;
     const operation = saveQueue.then(async () => {
-        const current = tasks.find((task) => String(task.id) === String(taskId));
+        if (requestVersion !== stateVersion) {
+            throw new ApiError("Сеанс завершён.", { status: 401 });
+        }
+
+        const current = getTask(taskId);
         if (!current) {
             throw new ApiError("Задача не найдена.", { status: 404 });
         }
@@ -123,15 +132,47 @@ function queuePatch(taskId, changes) {
     return operation;
 }
 
-function handleTaskNotFound(error) {
+async function toggleListStatus(task, checkbox) {
+    if (pendingStatuses.has(task.id)) {
+        return;
+    }
+
+    const requestVersion = stateVersion;
+    pendingStatuses.add(task.id);
+    checkbox.setAttribute("aria-disabled", "true");
+
+    try {
+        const updated = await queuePatch(task.id, { completed: !task.completed });
+        const modal = document.querySelector("#task-modal");
+        if (requestVersion === stateVersion && selectedTaskId === task.id && modal.open && !pendingImmediateSave) {
+            modal.querySelector("#edit-task-completed").checked = updated.completed;
+        }
+    } catch (error) {
+        if (requestVersion !== stateVersion || error.status === 401) {
+            return;
+        }
+        if (!handleTaskNotFound(error, task.id)) {
+            showNotice(error.message || "Не удалось изменить статус задачи.");
+        }
+    } finally {
+        if (requestVersion === stateVersion) {
+            pendingStatuses.delete(task.id);
+            document.getElementById(checkbox.id)?.setAttribute("aria-disabled", "false");
+        }
+    }
+}
+
+function handleTaskNotFound(error, taskId = selectedTaskId) {
     if (!(error instanceof ApiError) || error.status !== 404) {
         return false;
     }
 
-    allowModalClose = true;
-    closeModal(document.querySelector("#task-modal"));
-    allowModalClose = false;
-    selectedTaskId = null;
+    if (selectedTaskId === taskId) {
+        allowModalClose = true;
+        closeModal(document.querySelector("#task-modal"));
+        allowModalClose = false;
+        selectedTaskId = null;
+    }
     showNotice("Задача больше недоступна. Список обновлён.");
     loadTasks();
     return true;
@@ -145,7 +186,7 @@ export async function loadTasks() {
         const { data } = await apiRequest("/tasks", { auth: true });
         if (requestVersion === stateVersion) {
             tasks = Array.isArray(data) ? data.map(fromApi) : [];
-            renderTasks(tasks, openTask);
+            renderTaskList();
         }
     } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
@@ -183,7 +224,7 @@ async function createTask(event) {
 
         if (requestVersion === stateVersion) {
             tasks = [fromApi(data), ...tasks];
-            renderTasks(tasks, openTask);
+            renderTaskList();
             form.reset();
         }
     } catch (error) {
@@ -361,12 +402,13 @@ function handleBeforeModalClose(event) {
     }
 
     event.preventDefault();
+    const modal = event.currentTarget;
     Promise.resolve()
         .then(() => pendingImmediateSave)
         .then(() => flushTextChanges())
         .then(() => {
             allowModalClose = true;
-            closeModal(event.currentTarget);
+            closeModal(modal);
             allowModalClose = false;
         })
         .catch(() => undefined);
@@ -375,6 +417,7 @@ function handleBeforeModalClose(event) {
 export function resetTasks() {
     window.clearTimeout(textSaveTimer);
     stateVersion += 1;
+    pendingStatuses.clear();
     tasks = [];
     selectedTaskId = null;
     pendingTextSave = null;
