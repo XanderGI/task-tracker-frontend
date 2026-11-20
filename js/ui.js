@@ -139,16 +139,27 @@ export function setTasksError(message) {
     }
 }
 
-function createTaskCard(task, onOpen) {
+function createTaskCard(task, onOpen, onToggle, isPending) {
     const listItem = document.createElement("li");
+    const checkbox = document.createElement("button");
     const button = document.createElement("button");
     const title = document.createElement("span");
+
+    listItem.className = "task-row";
+    listItem.classList.toggle("is-completed", task.completed);
+    checkbox.id = `task-status-${task.id}`;
+    checkbox.type = "button";
+    checkbox.className = "task-status";
+    checkbox.setAttribute("role", "checkbox");
+    checkbox.setAttribute("aria-label", `Выполнена: ${task.title}`);
+    checkbox.setAttribute("aria-checked", String(task.completed));
+    checkbox.setAttribute("aria-disabled", String(isPending));
+    checkbox.addEventListener("click", () => onToggle(task, checkbox));
 
     button.type = "button";
     button.className = "task-card";
     button.dataset.taskId = String(task.id);
     button.setAttribute("aria-label", `Открыть задачу: ${task.title}`);
-    button.classList.toggle("is-completed", task.completed);
     button.addEventListener("click", () => onOpen(task.id));
 
     title.className = "task-card-title";
@@ -162,18 +173,20 @@ function createTaskCard(task, onOpen) {
         button.append(description);
     }
 
-    listItem.append(button);
+    listItem.append(checkbox, button);
     return listItem;
 }
 
-export function renderTasks(tasks, onOpen) {
+export function renderTasks(tasks, onOpen, onToggle, pendingStatuses) {
     const activeTasks = tasks.filter((task) => !task.completed);
     const completedTasks = tasks.filter((task) => task.completed);
     const activeList = document.querySelector("#active-task-list");
     const completedList = document.querySelector("#completed-task-list");
+    const focusedStatus = document.activeElement?.closest(".task-status")?.id;
+    const createRow = (task) => createTaskCard(task, onOpen, onToggle, pendingStatuses.has(task.id));
 
-    activeList?.replaceChildren(...activeTasks.map((task) => createTaskCard(task, onOpen)));
-    completedList?.replaceChildren(...completedTasks.map((task) => createTaskCard(task, onOpen)));
+    activeList?.replaceChildren(...activeTasks.map(createRow));
+    completedList?.replaceChildren(...completedTasks.map(createRow));
 
     document.querySelector("#tasks-loading")?.classList.add("is-hidden");
     document.querySelector("#tasks-error")?.classList.add("is-hidden");
@@ -183,7 +196,6 @@ export function renderTasks(tasks, onOpen) {
 
     const activeCount = document.querySelector("#active-task-count");
     const completedCount = document.querySelector("#completed-task-count");
-    const summary = document.querySelector("#tasks-summary");
 
     if (activeCount) {
         activeCount.textContent = String(activeTasks.length);
@@ -193,14 +205,15 @@ export function renderTasks(tasks, onOpen) {
         completedCount.textContent = String(completedTasks.length);
     }
 
-    if (summary) {
-        summary.textContent = activeTasks.length === 0
-            ? "Нет активных задач"
-            : `Активных задач: ${activeTasks.length}`;
+    if (focusedStatus) {
+        const status = document.getElementById(focusedStatus);
+        const collapsedGroup = status?.closest("details:not([open])");
+        (collapsedGroup?.querySelector("summary") ?? status)?.focus();
     }
 }
 
 export function resetTasksView() {
+    document.querySelector("#completed-tasks")?.removeAttribute("open");
     document.querySelector("#active-task-list")?.replaceChildren();
     document.querySelector("#completed-task-list")?.replaceChildren();
     document.querySelector("#tasks-loading")?.classList.add("is-hidden");

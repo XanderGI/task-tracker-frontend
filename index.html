@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Простой веб-интерфейс для управления задачами">
     <title>Task Tracker</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -30,6 +31,11 @@
                     <button id="logout-button" class="button button-secondary" type="button">Выйти</button>
                 </div>
             </nav>
+            <button id="theme-toggle" class="button button-secondary theme-toggle" type="button"
+                aria-label="Тёмная тема" aria-pressed="false">
+                <span aria-hidden="true">◐</span>
+                <span>Тёмная тема</span>
+            </button>
         </div>
     </header>
 
@@ -40,61 +46,47 @@
         </section>
 
         <section id="auth-error-view" class="auth-state-panel is-hidden" role="alert">
-            <p class="eyebrow">Сервис временно недоступен</p>
             <h1>Не удалось проверить авторизацию</h1>
             <p id="auth-error-message" class="welcome-copy"></p>
             <button id="retry-auth-button" class="button button-primary" type="button">Попробовать снова</button>
         </section>
 
         <section id="guest-view" class="welcome-panel is-hidden" aria-labelledby="welcome-title">
-            <p class="eyebrow">Порядок начинается с малого</p>
-            <h1 id="welcome-title">Соберите задачи в одном спокойном месте</h1>
+            <h1 id="welcome-title">Мои задачи</h1>
             <p class="welcome-copy">
-                Войдите в аккаунт или зарегистрируйтесь, чтобы создавать задачи,
-                отмечать выполненное и держать фокус на следующем шаге.
+                Войдите, чтобы открыть свой список, или создайте аккаунт.
             </p>
             <div class="welcome-actions">
                 <button class="button button-primary button-large" type="button" data-open-modal="registration-modal">
-                    Начать работу
+                    Создать аккаунт
                 </button>
                 <button class="button button-text" type="button" data-open-modal="login-modal">
-                    У меня уже есть аккаунт
+                    Войти
                 </button>
             </div>
         </section>
 
         <section id="tasks-view" class="tasks-view is-hidden" aria-labelledby="tasks-title">
-            <div class="section-heading">
-                <div>
-                    <p class="eyebrow">Мои задачи</p>
-                    <h1 id="tasks-title">Что нужно сделать?</h1>
-                </div>
-                <p id="tasks-summary" class="tasks-summary" aria-live="polite">Нет активных задач</p>
-            </div>
+            <h1 id="tasks-title">Мои задачи</h1>
 
             <form id="create-task-form" class="create-task-form">
-                <div class="create-task-fields">
-                    <label class="visually-hidden" for="new-task-title">Название новой задачи</label>
-                    <input
-                        id="new-task-title"
-                        name="title"
-                        type="text"
-                        maxlength="255"
-                        placeholder="Например, подготовить план на неделю"
-                        autocomplete="off"
-                        required
-                    >
-
-                    <label class="visually-hidden" for="new-task-description">Описание новой задачи</label>
-                    <textarea
-                        id="new-task-description"
-                        name="description"
-                        rows="3"
-                        maxlength="1000"
-                        placeholder="Описание задачи — необязательно"
-                    ></textarea>
-                </div>
+                <label class="visually-hidden" for="new-task-title">Название новой задачи</label>
+                <input
+                    id="new-task-title"
+                    name="title"
+                    type="text"
+                    maxlength="256"
+                    placeholder="Добавить задачу…"
+                    autocomplete="off"
+                    required
+                >
                 <button class="button button-primary" type="submit">Добавить</button>
+                <details class="create-task-details">
+                    <summary>Добавить описание</summary>
+                    <label class="visually-hidden" for="new-task-description">Описание новой задачи</label>
+                    <textarea id="new-task-description" name="description" rows="2" maxlength="512"
+                        placeholder="Описание задачи"></textarea>
+                </details>
             </form>
             <p id="create-task-error" class="form-message form-message-error is-hidden" role="alert"></p>
 
@@ -108,7 +100,7 @@
                 <button id="retry-tasks-button" class="button button-secondary" type="button">Попробовать снова</button>
             </div>
 
-            <div id="task-lists" class="task-columns">
+            <div id="task-lists" class="task-groups">
                 <section class="task-list-section" aria-labelledby="active-tasks-title">
                     <div class="list-heading">
                         <h2 id="active-tasks-title">В работе</h2>
@@ -118,14 +110,14 @@
                     <p id="active-tasks-empty" class="empty-state">Здесь появятся новые задачи.</p>
                 </section>
 
-                <section class="task-list-section" aria-labelledby="completed-tasks-title">
-                    <div class="list-heading">
-                        <h2 id="completed-tasks-title">Готово</h2>
+                <details id="completed-tasks" class="task-list-section completed-tasks">
+                    <summary class="list-heading">
+                        <span>Выполненные</span>
                         <span id="completed-task-count" class="count-badge">0</span>
-                    </div>
+                    </summary>
                     <ul id="completed-task-list" class="task-list" aria-live="polite"></ul>
-                    <p id="completed-tasks-empty" class="empty-state">Выполненные задачи будут храниться здесь.</p>
-                </section>
+                    <p id="completed-tasks-empty" class="empty-state">Пока нет выполненных задач.</p>
+                </details>
             </div>
         </section>
     </main>
@@ -133,7 +125,6 @@
     <dialog id="registration-modal" class="modal" aria-labelledby="registration-title">
         <div class="modal-card">
             <button class="modal-close" type="button" data-close-modal aria-label="Закрыть окно">×</button>
-            <p class="eyebrow">Новый аккаунт</p>
             <h2 id="registration-title">Регистрация</h2>
             <p class="modal-copy">Создайте аккаунт, чтобы начать вести список задач.</p>
 
@@ -142,11 +133,11 @@
                 <input id="registration-email" name="email" type="email" maxlength="255" autocomplete="email" required>
 
                 <label for="registration-password">Пароль</label>
-                <input id="registration-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
-                <span class="field-hint">Минимум 6 символов</span>
+                <input id="registration-password" name="password" type="password" minlength="8" maxlength="64" autocomplete="new-password" required>
+                <span class="field-hint">Минимум 8 символов</span>
 
                 <label for="registration-password-repeat">Повторите пароль</label>
-                <input id="registration-password-repeat" name="passwordRepeat" type="password" minlength="6" autocomplete="new-password" required>
+                <input id="registration-password-repeat" name="passwordRepeat" type="password" minlength="8" maxlength="64" autocomplete="new-password" required>
 
                 <p class="form-message form-message-error is-hidden" data-form-error role="alert"></p>
                 <button class="button button-primary button-full" type="submit" data-pending-label="Создаём аккаунт…">
@@ -159,7 +150,6 @@
     <dialog id="login-modal" class="modal" aria-labelledby="login-title">
         <div class="modal-card">
             <button class="modal-close" type="button" data-close-modal aria-label="Закрыть окно">×</button>
-            <p class="eyebrow">С возвращением</p>
             <h2 id="login-title">Вход</h2>
             <p class="modal-copy">Введите данные аккаунта, чтобы открыть свои задачи.</p>
 
@@ -181,15 +171,14 @@
     <dialog id="task-modal" class="modal" aria-labelledby="task-modal-title">
         <div class="modal-card modal-card-wide">
             <button class="modal-close" type="button" data-close-modal aria-label="Закрыть окно">×</button>
-            <p class="eyebrow">Редактирование</p>
             <h2 id="task-modal-title">Задача</h2>
 
             <form id="edit-task-form" class="stacked-form">
                 <label for="edit-task-title">Название</label>
-                <input id="edit-task-title" name="title" type="text" maxlength="255" required>
+                <input id="edit-task-title" name="title" type="text" maxlength="256" required>
 
                 <label for="edit-task-description">Описание</label>
-                <textarea id="edit-task-description" name="description" rows="6" maxlength="1000" placeholder="Добавьте детали задачи"></textarea>
+                <textarea id="edit-task-description" name="description" rows="6" maxlength="512" placeholder="Добавьте детали задачи"></textarea>
 
                 <label class="checkbox-field" for="edit-task-completed">
                     <input id="edit-task-completed" name="completed" type="checkbox">

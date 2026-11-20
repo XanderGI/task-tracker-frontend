@@ -27,19 +27,37 @@ let lastSavedText = null;
 let allowModalClose = false;
 let isDeleting = false;
 let stateVersion = 0;
+const pendingStatuses = new Set();
+
+function fromApi(task) {
+    return {
+        ...task,
+        description: task.text ?? "",
+        completed: Boolean(task.isFinished),
+    };
+}
+
+function toApiBody({ title, description }) {
+    return { title, text: description ?? "" };
+}
+
 
 function getTask(taskId) {
     return tasks.find((task) => task.id === Number(taskId));
 }
 
+function renderTaskList() {
+    renderTasks(tasks, openTask, toggleListStatus, pendingStatuses);
+}
+
 function replaceTask(updatedTask) {
     tasks = tasks.map((task) => task.id === updatedTask.id ? updatedTask : task);
-    renderTasks(tasks, openTask);
+    renderTaskList();
 }
 
 function removeTask(taskId) {
     tasks = tasks.filter((task) => task.id !== taskId);
-    renderTasks(tasks, openTask);
+    renderTaskList();
 }
 
 function getTextFields() {
@@ -69,32 +87,92 @@ function hasDirtyText() {
 function queuePatch(taskId, changes) {
     const requestVersion = stateVersion;
     const operation = saveQueue.then(async () => {
-        const { data } = await apiRequest(`/tasks/${taskId}`, {
-            method: "PATCH",
-            body: changes,
-            auth: true,
-        });
-
-        if (requestVersion === stateVersion) {
-            replaceTask(data);
+        if (requestVersion !== stateVersion) {
+            throw new ApiError("Сеанс завершён.", { status: 401 });
         }
 
-        return data;
+        const current = getTask(taskId);
+        if (!current) {
+            throw new ApiError("Задача не найдена.", { status: 404 });
+        }
+
+        let data = null;
+
+        if (changes.title !== undefined || changes.description !== undefined) {
+            ({ data } = await apiRequest(`/tasks/${taskId}`, {
+                method: "PUT",
+                body: toApiBody({
+                    title: changes.title ?? current.title,
+                    description: changes.description ?? current.description,
+                }),
+                auth: true,
+            }));
+        }
+
+        if (changes.completed !== undefined) {
+            ({ data } = await apiRequest(`/tasks/${taskId}/status`, {
+                method: "PATCH",
+                body: { done: Boolean(changes.completed) },
+                auth: true,
+            }));
+        }
+
+        if (data === null) {
+            return current;
+        }
+
+        const task = fromApi(data);
+        if (requestVersion === stateVersion) {
+            replaceTask(task);
+        }
+        return task;
     });
 
     saveQueue = operation.catch(() => undefined);
     return operation;
 }
 
-function handleTaskNotFound(error) {
+async function toggleListStatus(task, checkbox) {
+    if (pendingStatuses.has(task.id)) {
+        return;
+    }
+
+    const requestVersion = stateVersion;
+    pendingStatuses.add(task.id);
+    checkbox.setAttribute("aria-disabled", "true");
+
+    try {
+        const updated = await queuePatch(task.id, { completed: !task.completed });
+        const modal = document.querySelector("#task-modal");
+        if (requestVersion === stateVersion && selectedTaskId === task.id && modal.open && !pendingImmediateSave) {
+            modal.querySelector("#edit-task-completed").checked = updated.completed;
+        }
+    } catch (error) {
+        if (requestVersion !== stateVersion || error.status === 401) {
+            return;
+        }
+        if (!handleTaskNotFound(error, task.id)) {
+            showNotice(error.message || "Не удалось изменить статус задачи.");
+        }
+    } finally {
+        if (requestVersion === stateVersion) {
+            pendingStatuses.delete(task.id);
+            document.getElementById(checkbox.id)?.setAttribute("aria-disabled", "false");
+        }
+    }
+}
+
+function handleTaskNotFound(error, taskId = selectedTaskId) {
     if (!(error instanceof ApiError) || error.status !== 404) {
         return false;
     }
 
-    allowModalClose = true;
-    closeModal(document.querySelector("#task-modal"));
-    allowModalClose = false;
-    selectedTaskId = null;
+    if (selectedTaskId === taskId) {
+        allowModalClose = true;
+        closeModal(document.querySelector("#task-modal"));
+        allowModalClose = false;
+        selectedTaskId = null;
+    }
     showNotice("Задача больше недоступна. Список обновлён.");
     loadTasks();
     return true;
@@ -107,8 +185,8 @@ export async function loadTasks() {
     try {
         const { data } = await apiRequest("/tasks", { auth: true });
         if (requestVersion === stateVersion) {
-            tasks = Array.isArray(data) ? data : [];
-            renderTasks(tasks, openTask);
+            tasks = Array.isArray(data) ? data.map(fromApi) : [];
+            renderTaskList();
         }
     } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
@@ -140,13 +218,13 @@ async function createTask(event) {
     try {
         const { data } = await apiRequest("/tasks", {
             method: "POST",
-            body: { title, description },
+            body: toApiBody({ title, description }),
             auth: true,
         });
 
         if (requestVersion === stateVersion) {
-            tasks = [data, ...tasks];
-            renderTasks(tasks, openTask);
+            tasks = [fromApi(data), ...tasks];
+            renderTaskList();
             form.reset();
         }
     } catch (error) {
@@ -324,12 +402,13 @@ function handleBeforeModalClose(event) {
     }
 
     event.preventDefault();
+    const modal = event.currentTarget;
     Promise.resolve()
         .then(() => pendingImmediateSave)
         .then(() => flushTextChanges())
         .then(() => {
             allowModalClose = true;
-            closeModal(event.currentTarget);
+            closeModal(modal);
             allowModalClose = false;
         })
         .catch(() => undefined);
@@ -338,6 +417,7 @@ function handleBeforeModalClose(event) {
 export function resetTasks() {
     window.clearTimeout(textSaveTimer);
     stateVersion += 1;
+    pendingStatuses.clear();
     tasks = [];
     selectedTaskId = null;
     pendingTextSave = null;
