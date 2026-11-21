@@ -1,40 +1,25 @@
 # Task Tracker Frontend
 
-Фронтенд проекта Task Tracker. Основан на [оригинальном фронтенде prplhd](https://github.com/prplhd/tack-tracker-frontend) и адаптирован под API моего проекта.
+Веб-клиент Task Tracker. Здесь можно зарегистрироваться, войти, создать, отредактировать, завершить или удалить задачу. Диалог «Последний отчёт» при открытии загружает последний успешно сгенерированный отчёт пользователя.
 
-Одностраничный веб-интерфейс для регистрации и авторизации пользователей, создания, редактирования, завершения и удаления задач. Для взаимодействия с backend используется REST API, JWT хранится в `localStorage`.
+За основу взят фронтенд prplhd. [Исходный проект](https://github.com/prplhd/tack-tracker-frontend). При переделывании фронтенда вдохновлялся приложением [Tick-tick](https://ticktick.com).
 
-## Стек
-
-- HTML
-- CSS
-- JavaScript
-- Fetch API
-- Nginx
-- Docker
-
-## Структура
-
-- `index.html` — основная страница приложения
-- `css/` — стили
-- `js/` — логика интерфейса и работа с API
-- `nginx/default.conf` — конфигурация Nginx
-- `Dockerfile` — Docker-образ frontend
+Интерфейс написан на HTML, CSS и JavaScript. Запросы к REST API идут через Fetch, JWT хранится в `localStorage`. Nginx раздаёт статику и проксирует `/api/*` в backend, убирая префикс `/api`.
 
 ## Запуск
 
-В production frontend запускается в составе общего Docker Compose:
-
-https://github.com/XanderGI/task-tracker-deploy
+Для полного запуска выполните команду из каталога `task-tracker-deploy` после подготовки `.env`. [Инструкция по запуску стека](https://github.com/XanderGI/task-tracker-deploy#полный-стек).
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yaml up -d
 ```
-
-Nginx раздаёт статические файлы приложения на порту `80` и проксирует запросы `/api/*` в backend-сервис.
 
 ## Локальная разработка
 
-Frontend не требует сборки или установки зависимостей. Проект можно открыть в IDE и запускать через локальный веб-сервер.
+Запустите backend на хосте на порту `8080`. С запущенным Docker Desktop выполните команду из каталога `task-tracker-frontend`.
 
-Для работы приложения backend должен быть доступен через путь `/api`.
+```bash
+docker compose -f compose.local.yaml up -d
+```
+
+Фронтенд доступен по адресу: `http://127.0.0.1:8081`. Запросы к `/api` пойдут на `host.docker.internal:8080`. 
