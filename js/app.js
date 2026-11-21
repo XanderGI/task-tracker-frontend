@@ -1,5 +1,6 @@
 import { initializeAuth } from "./auth.js";
 import { initializeTasks } from "./tasks.js";
+import { initializeReports } from "./reports.js";
 import { bindModalControls } from "./ui.js";
 
 function initializeTheme() {
@@ -12,7 +13,7 @@ function initializeTheme() {
     try {
         preference = window.localStorage.getItem(storageKey);
     } catch {
-        // The theme can still be changed for the current page.
+
     }
 
     function applyTheme() {
@@ -27,7 +28,7 @@ function initializeTheme() {
         try {
             window.localStorage.setItem(storageKey, preference);
         } catch {
-            // Keep the chosen theme until the page is reloaded.
+
         }
     });
     systemTheme.addEventListener("change", applyTheme);
@@ -37,11 +38,16 @@ function initializeTheme() {
 function initializeApp() {
     initializeTheme();
     bindModalControls();
+
     const taskController = initializeTasks();
+    const reportController = initializeReports();
 
     initializeAuth({
         onAuthenticated: taskController.loadTasks,
-        onSignedOut: taskController.resetTasks,
+        onSignedOut() {
+            taskController.resetTasks();
+            reportController.resetReport();
+        },
     });
 }
 
