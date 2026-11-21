@@ -278,8 +278,42 @@ h2 {
     line-height: 1.55;
 }
 
-.tasks-view h1 {
+.tasks-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
     margin-bottom: 20px;
+}
+
+.tasks-header h1 {
+    margin: 0;
+}
+
+#report-modal {
+    width: min(calc(100% - 32px), 620px);
+}
+
+#report-modal-title {
+    padding-inline-end: 44px;
+}
+
+.report-date {
+    margin: 0 0 16px;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+
+.report-text {
+    max-height: min(55dvh, 26rem);
+    overflow-y: auto;
+    padding: 16px;
+    border-radius: var(--radius-small);
+    background: var(--color-surface-muted);
+    line-height: 1.6;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
 }
 
 .user-email {
